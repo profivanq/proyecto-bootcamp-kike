@@ -1,14 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
-import {
-  ROLES,
-  shiftMeta,
-  roleColor,
-  MESES,
-  type RoleKey,
-  type Mode,
-} from "@/lib/constants";
+import { ROLES, shiftMeta, roleColor, type RoleKey, type Mode } from "@/lib/constants";
 import { buildPlannerView, type Collaborator, type AssignmentMap } from "@/lib/coverage";
 import {
   cycleShiftAction,
@@ -52,17 +45,17 @@ export default function Planner({
     [collaborators, assignments, year, month, requirePhysical]
   );
 
-  const monthLabel = `${MESES[month]} ${year}`;
-  const nCols = view.satData.length;
-  const gridTemplate = `minmax(190px, 1.3fr) repeat(${nCols}, minmax(104px, 1fr))`;
-
   function prevMonth() {
-    setMonth((m) => (m === 0 ? 11 : m - 1));
-    setYear((y) => (month === 0 ? y - 1 : y));
+    const m = month === 0 ? 11 : month - 1;
+    const y = month === 0 ? year - 1 : year;
+    setMonth(m);
+    setYear(y);
   }
   function nextMonth() {
-    setMonth((m) => (m === 11 ? 0 : m + 1));
-    setYear((y) => (month === 11 ? y + 1 : y));
+    const m = month === 11 ? 0 : month + 1;
+    const y = month === 11 ? year + 1 : year;
+    setMonth(m);
+    setYear(y);
   }
 
   function rotate(cid: number, iso: string) {
@@ -100,7 +93,7 @@ export default function Planner({
       });
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/jpeg", 0.95);
-      const mes = MESES[month].toLowerCase();
+      const mes = view.monthLabel.split(" ")[0].toLowerCase();
       a.download = `programacion-iacademy-${mes}-${year}.jpg`;
       a.click();
     } catch {
@@ -110,7 +103,7 @@ export default function Planner({
     }
   }
 
-  // ── estilos ────────────────────────────────────────────────────────────────
+  // ── estilos (portados del diseño original) ──────────────────────────────────
   const headerStyle: CSSProperties = {
     display: "flex",
     alignItems: "center",
@@ -184,7 +177,11 @@ export default function Planner({
     fontSize: 11,
     cursor: "pointer",
   };
-  const sectionTitle: CSSProperties = { fontSize: 15, fontWeight: 800, color: "#0f172a" };
+  const card: CSSProperties = {
+    background: "#fff",
+    borderRadius: 16,
+    boxShadow: "0 1px 3px rgba(2,6,23,.08)",
+  };
   const cellBase: CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -197,36 +194,54 @@ export default function Planner({
     fontWeight: 700,
     fontSize: 13,
     userSelect: "none",
+    flex: 1,
+    minWidth: 104,
   };
+  const infoCol: CSSProperties = { width: 220, flex: "0 0 220px" };
 
-  const legend = [
-    { label: "AM", sub: "8–1", sh: "AM" },
-    { label: "PM", sub: "1–5", sh: "PM" },
-    { label: "Completo", sub: "8–5", sh: "COMP" },
-    { label: "Libre", sub: "", sh: "LIBRE" },
-  ];
+  const legendShifts = ["AM", "PM", "COMP", "LIBRE"];
 
   return (
     <div className="shell">
       <div ref={exportRef} id="plan-export">
-        {/* Header */}
+        {/* ── Header ── */}
         <div style={headerStyle}>
-          <div>
-            <div style={{ fontSize: 19, fontWeight: 800 }}>Planificador de Sábados</div>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>iAcademy · Turnos del mes</div>
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.2px" }}>
+              Planificador de Sábados
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                opacity: 0.7,
+                fontWeight: 600,
+                letterSpacing: ".5px",
+                textTransform: "uppercase",
+              }}
+            >
+              iAcademy · Turnos del mes
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <button style={navBtn} onClick={prevMonth} data-noexport aria-label="Mes anterior">
               ‹
             </button>
-            <div style={{ fontSize: 15, fontWeight: 800, minWidth: 130, textAlign: "center" }}>
-              {monthLabel}
-            </div>
+            <span
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                minWidth: 150,
+                textAlign: "center",
+                textTransform: "capitalize",
+              }}
+            >
+              {view.monthLabel}
+            </span>
             <button style={navBtn} onClick={nextMonth} data-noexport aria-label="Mes siguiente">
               ›
             </button>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={alertPill} onClick={() => setAlertsOpen(true)}>
               {view.alertOk
                 ? "✓ Todos los bloques cubiertos"
@@ -239,18 +254,29 @@ export default function Planner({
           </div>
         </div>
 
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 22 }}>
-          {/* Colaboradores */}
-          <section>
+        {/* ── Cuerpo: 2 columnas ── */}
+        <div
+          style={{
+            display: "flex",
+            gap: 20,
+            padding: 20,
+            alignItems: "flex-start",
+            background: "#eef2f6",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Barra lateral: Colaboradores */}
+          <aside style={{ ...card, width: 330, flex: "1 1 300px", maxWidth: 360 }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 12,
+                padding: "14px 16px",
+                borderBottom: "1px solid #eef2f6",
               }}
             >
-              <div style={sectionTitle}>Colaboradores</div>
+              <span style={{ fontWeight: 800, fontSize: 15 }}>Colaboradores</span>
               <button
                 style={addBtn}
                 data-noexport
@@ -259,19 +285,26 @@ export default function Planner({
                 + Agregar
               </button>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: 14,
+                maxHeight: 640,
+                overflowY: "auto",
+              }}
+            >
               {view.rows.map((r) => (
                 <div
                   key={r.id}
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
+                    alignItems: "flex-start",
+                    gap: 11,
+                    padding: "11px 12px",
                     border: "1px solid #e2e8f0",
                     borderRadius: 12,
-                    background: "#fff",
-                    minWidth: 230,
                   }}
                 >
                   <span
@@ -281,37 +314,40 @@ export default function Planner({
                       borderRadius: 4,
                       background: roleColor(r.role),
                       flex: "0 0 auto",
+                      marginTop: 2,
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{r.role}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{r.role}</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 7, flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 9px",
+                          borderRadius: 20,
+                          background: r.mode === "virtual" ? "#ede9fe" : "#e0f2fe",
+                          color: r.mode === "virtual" ? "#6d28d9" : "#0369a1",
+                        }}
+                      >
+                        {r.mode === "virtual" ? "Virtual" : "Físico"}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 9px",
+                          borderRadius: 20,
+                          background: r.libreOk ? "#dcfce7" : "#fef3c7",
+                          color: r.libreOk ? "#166534" : "#92400e",
+                        }}
+                      >
+                        {r.libre} libre{r.libre === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "2px 9px",
-                      borderRadius: 20,
-                      background: r.mode === "virtual" ? "#ede9fe" : "#e0f2fe",
-                      color: r.mode === "virtual" ? "#6d28d9" : "#0369a1",
-                    }}
-                  >
-                    {r.mode === "virtual" ? "Virtual" : "Físico"}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "2px 9px",
-                      borderRadius: 20,
-                      background: r.libreOk ? "#dcfce7" : "#fef3c7",
-                      color: r.libreOk ? "#166534" : "#92400e",
-                    }}
-                  >
-                    {r.libre} libre{r.libre === 1 ? "" : "s"}
-                  </span>
-                  <div style={{ display: "flex", gap: 6 }} data-noexport>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }} data-noexport>
                     <button
                       style={editBtn}
                       onClick={() =>
@@ -327,75 +363,110 @@ export default function Planner({
                 </div>
               ))}
             </div>
-          </section>
+          </aside>
 
-          {/* Asignación de turnos */}
-          <section>
-            <div style={{ ...sectionTitle, marginBottom: 4 }}>
-              Asignación de turnos · {monthLabel}
-            </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-              Haz clic en una celda para rotar: AM → PM → Completo → Libre
-            </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-              {legend.map((l) => {
-                const m = shiftMeta(l.sh);
-                return (
-                  <span
-                    key={l.sh}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "#475569",
-                    }}
-                  >
+          {/* Panel principal: Asignación de turnos */}
+          <section style={{ ...card, flex: "999 1 560px", minWidth: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "14px 18px",
+                borderBottom: "1px solid #eef2f6",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+                <span style={{ fontWeight: 800, fontSize: 15 }}>
+                  Asignación de turnos ·{" "}
+                  <span style={{ textTransform: "capitalize" }}>{view.monthLabel}</span>
+                </span>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                  Haz clic en una celda para rotar: AM → PM → Completo → Libre
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                {legendShifts.map((sh) => {
+                  const m = shiftMeta(sh);
+                  return (
                     <span
+                      key={sh}
                       style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "4px 9px",
+                        borderRadius: 7,
                         background: m.bg,
+                        color: m.fg,
                         border: "1px solid " + m.border,
                       }}
-                    />
-                    {l.label}
-                    {l.sub ? ` · ${l.sub}` : ""}
-                  </span>
-                );
-              })}
+                    >
+                      {m.label}
+                      {m.sub ? ` · ${m.sub}` : ""}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="scroll-x">
-              <div style={{ minWidth: 200 + nCols * 110 }}>
-                {/* Encabezado */}
-                <div style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b", padding: "6px 4px" }}>
+            <div style={{ overflowX: "auto", padding: "14px 18px 20px" }}>
+              <div style={{ minWidth: 640, display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* Encabezado de columnas */}
+                <div style={{ display: "flex", alignItems: "stretch" }}>
+                  <div
+                    style={{
+                      ...infoCol,
+                      display: "flex",
+                      alignItems: "center",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: "#94a3b8",
+                    }}
+                  >
                     Colaborador
                   </div>
-                  {view.satData.map((s) => (
-                    <div key={s.iso} style={{ textAlign: "center", padding: "6px 4px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 800 }}>{s.head}</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.sub}</div>
-                    </div>
-                  ))}
+                  <div style={{ display: "flex", flex: 1, gap: 8 }}>
+                    {view.satData.map((s) => (
+                      <div
+                        key={s.iso}
+                        style={{
+                          flex: 1,
+                          minWidth: 104,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span style={{ fontSize: 15, fontWeight: 800 }}>{s.head}</span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: "#94a3b8",
+                            textTransform: "uppercase",
+                            letterSpacing: ".4px",
+                          }}
+                        >
+                          {s.sub}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Filas de colaboradores */}
                 {view.rows.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: gridTemplate,
-                      gap: 8,
-                      alignItems: "center",
-                      marginTop: 8,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <div key={r.id} style={{ display: "flex", alignItems: "center" }}>
+                    <div
+                      style={{
+                        ...infoCol,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 9,
+                        paddingRight: 8,
+                      }}
+                    >
                       <span
                         style={{
                           width: 11,
@@ -405,87 +476,89 @@ export default function Planner({
                           flex: "0 0 auto",
                         }}
                       />
-                      <div style={{ minWidth: 0 }}>
-                        <div
+                      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15, minWidth: 0 }}>
+                        <span
                           style={{
                             fontWeight: 700,
                             fontSize: 13,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
                           {r.name}
-                          {r.mode === "virtual" && (
-                            <span
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 800,
-                                letterSpacing: 0.4,
-                                padding: "1px 5px",
-                                borderRadius: 5,
-                                background: "#ede9fe",
-                                color: "#6d28d9",
-                              }}
-                            >
-                              VIRTUAL
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{r.role}</div>
+                        </span>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{r.role}</span>
                       </div>
-                    </div>
-                    {r.cells.map((cell) => {
-                      const m = shiftMeta(cell.shift);
-                      return (
-                        <div
-                          key={cell.key}
-                          onClick={() => rotate(r.id, cell.iso)}
-                          title="Clic para rotar el turno"
+                      {r.mode === "virtual" && (
+                        <span
                           style={{
-                            ...cellBase,
-                            background: m.bg,
-                            color: m.fg,
-                            border: "1px solid " + m.border,
+                            marginLeft: "auto",
+                            fontSize: 9,
+                            fontWeight: 800,
+                            color: "#7c3aed",
+                            background: "#ede9fe",
+                            padding: "1px 5px",
+                            borderRadius: 5,
+                            letterSpacing: ".4px",
                           }}
                         >
-                          <span>{m.label}</span>
-                          {m.sub && <span style={{ fontSize: 10, fontWeight: 600 }}>{m.sub}</span>}
-                        </div>
-                      );
-                    })}
+                          VIRTUAL
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flex: 1, gap: 8 }}>
+                      {r.cells.map((cell) => {
+                        const m = shiftMeta(cell.shift);
+                        return (
+                          <div
+                            key={cell.key}
+                            onClick={() => rotate(r.id, cell.iso)}
+                            title="Clic para rotar el turno"
+                            style={{
+                              ...cellBase,
+                              background: m.bg,
+                              color: m.fg,
+                              border: "1px solid " + m.border,
+                            }}
+                          >
+                            <span>{m.label}</span>
+                            {m.sub && (
+                              <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.65 }}>
+                                {m.sub}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
 
+                {/* Separador */}
+                <div style={{ height: 1, background: "#eef2f6", margin: "6px 0" }} />
+
                 {/* Cobertura AM / PM */}
-                <div
-                  style={{
-                    marginTop: 18,
-                    paddingTop: 14,
-                    borderTop: "1px dashed #e2e8f0",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                  }}
-                >
-                  {view.coverageRows.map((cr) => (
+                {view.coverageRows.map((cr) => (
+                  <div key={cr.block} style={{ display: "flex", alignItems: "stretch" }}>
                     <div
-                      key={cr.block}
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: gridTemplate,
-                        gap: 8,
-                        alignItems: "stretch",
+                        ...infoCol,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
                       }}
                     >
-                      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                        <div style={{ fontSize: 13, fontWeight: 800 }}>{cr.label}</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{cr.sub}</div>
-                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 800 }}>{cr.label}</span>
+                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{cr.sub}</span>
+                    </div>
+                    <div style={{ display: "flex", flex: 1, gap: 8 }}>
                       {cr.cells.map((cc) => (
                         <div
                           key={cc.iso}
                           style={{
+                            flex: 1,
+                            minWidth: 104,
                             display: "flex",
                             flexDirection: "column",
                             gap: 5,
@@ -495,20 +568,6 @@ export default function Planner({
                             border: "1px solid " + (cc.ok ? "#bbf7d0" : "#fecaca"),
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              padding: "2px 6px",
-                              borderRadius: 6,
-                              alignSelf: "flex-start",
-                              background: cc.physOk ? accent : "#fee2e2",
-                              color: cc.physOk ? "#fff" : "#dc2626",
-                              border: cc.physOk ? "1px solid transparent" : "1px dashed #f87171",
-                            }}
-                          >
-                            {cc.physOk ? "Físico" : "Sin físico"}
-                          </span>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                             {cc.roles.map((d) => (
                               <span
@@ -527,39 +586,65 @@ export default function Planner({
                               </span>
                             ))}
                           </div>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: "2px 6px",
+                              borderRadius: 6,
+                              alignSelf: "flex-start",
+                              background: cc.physOk ? accent : "#fee2e2",
+                              color: cc.physOk ? "#fff" : "#dc2626",
+                              border: cc.physOk ? "1px solid transparent" : "1px dashed #f87171",
+                            }}
+                          >
+                            {cc.physOk ? "Físico" : "Sin físico"}
+                          </span>
                         </div>
                       ))}
                     </div>
+                  </div>
+                ))}
+
+                {/* Leyenda de roles */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    marginTop: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Roles:
+                  </span>
+                  {ROLES.map((r) => (
+                    <span
+                      key={r.key}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span
+                        style={{ width: 10, height: 10, borderRadius: 3, background: r.color }}
+                      />
+                      {r.abbr} · {r.key}
+                    </span>
                   ))}
                 </div>
               </div>
-            </div>
-
-            {/* Leyenda de roles */}
-            <div
-              style={{
-                marginTop: 16,
-                display: "flex",
-                gap: 14,
-                flexWrap: "wrap",
-                fontSize: 12,
-                color: "#475569",
-              }}
-            >
-              <span style={{ fontWeight: 800 }}>Roles:</span>
-              {ROLES.map((r) => (
-                <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 4,
-                      background: r.color,
-                    }}
-                  />
-                  {r.abbr} · {r.key}
-                </span>
-              ))}
             </div>
           </section>
         </div>
@@ -583,31 +668,32 @@ export default function Planner({
         </div>
       )}
 
-      {alertsOpen && <AlertsModal view={view} accent={accent} onClose={() => setAlertsOpen(false)} />}
+      {alertsOpen && <AlertsModal view={view} onClose={() => setAlertsOpen(false)} />}
       {editing && (
-        <CollaboratorModal
-          accent={accent}
-          editing={editing}
-          onClose={() => setEditing(null)}
-        />
+        <CollaboratorModal accent={accent} editing={editing} onClose={() => setEditing(null)} />
       )}
     </div>
   );
 }
 
-// ── Modal de alertas ───────────────────────────────────────────────────────
+// ── Modal de alertas ─────────────────────────────────────────────────────────
 function AlertsModal({
   view,
-  accent,
   onClose,
 }: {
   view: ReturnType<typeof buildPlannerView>;
-  accent: string;
   onClose: () => void;
 }) {
   return (
     <Overlay onClose={onClose}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 4,
+        }}
+      >
         <div style={{ fontSize: 16, fontWeight: 800 }}>Alertas de cobertura</div>
         <button onClick={onClose} aria-label="Cerrar" style={iconClose}>
           ×
@@ -641,14 +727,7 @@ function AlertsModal({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {view.alerts.map((al, i) => (
-            <div
-              key={i}
-              style={{
-                border: "1px solid #fecaca",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
+            <div key={i} style={{ border: "1px solid #fecaca", borderRadius: 12, overflow: "hidden" }}>
               <div
                 style={{
                   display: "flex",
@@ -720,12 +799,20 @@ function CollaboratorModal({
     color: active ? "#fff" : "#475569",
   });
 
-  async function onSubmit(formData: FormData) {
+  // Llamada explícita a la Server Action (no dependemos del `action` del form).
+  async function handleSave() {
+    if (!name.trim() || pending) return;
     setPending(true);
     try {
-      await saveCollaboratorAction(formData);
+      const fd = new FormData();
+      if (editing.id != null) fd.set("id", String(editing.id));
+      fd.set("name", name.trim());
+      fd.set("role", role);
+      fd.set("mode", mode);
+      await saveCollaboratorAction(fd);
       onClose();
-    } finally {
+    } catch {
+      alert("No se pudo guardar el colaborador. Intenta de nuevo.");
       setPending(false);
     }
   }
@@ -735,15 +822,16 @@ function CollaboratorModal({
       <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>
         {editing.id != null ? "Editar colaborador" : "Nuevo colaborador"}
       </div>
-      <form action={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {editing.id != null && <input type="hidden" name="id" value={editing.id} />}
-        <input type="hidden" name="role" value={role} />
-        <input type="hidden" name="mode" value={mode} />
-
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSave();
+        }}
+        style={{ display: "flex", flexDirection: "column", gap: 14 }}
+      >
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={labelStyle}>Nombre</span>
           <input
-            name="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
